@@ -54,10 +54,27 @@ class StatisticRequest extends Request
     public function getMean(): array {
       $uriAvg = array();
       foreach ( $this->m_requests as $uri => $val ) {
-        $filteredResponseArr = array_filter($this->m_requests[$uri]);
-        $uriAvg[$uri] = array_sum($filteredResponseArr)/count($filteredResponseArr);
+        $fResponseArr = array_filter($this->m_requests[$uri]);
+        $uriAvg[$uri] = array_sum($fResponseArr)/count($fResponseArr);
       }
       return $uriAvg;
+    }
+
+    public function getSD(): array {
+      $uriAvg = $this->getMean();
+      $uriSD = array();
+
+      foreach ( $this->m_requests as $uri => $val ) {
+        $variance = 0.0;
+
+        $fResponseArr = array_filter($this->m_requests[$uri]);
+        foreach ( $fResponseArr as $response ) {
+          $variance += pow(($response - $uriAvg[$uri]), 2);
+        }
+
+        $uriSD[$uri] = (float)sqrt($variance/count($fResponseArr));
+      }
+      return $uriSD;
     }
 
 }
