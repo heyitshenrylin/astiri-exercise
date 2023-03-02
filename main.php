@@ -18,3 +18,10 @@ foreach ( $request->m_requests as $key => $val ) {
       echo "\n$key\t$var";
     }
 }
+
+$means = $request->getMean();
+
+echo "\n\nURI\tMean Time";
+foreach ( $means as $key => $val ) {
+    echo "\n$key\t$val";
+}
