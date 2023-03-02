@@ -1,6 +1,7 @@
 # astiri-exercise
 ###### A PHP coding exercise
 Author: Henry Lin
+Github Repo: https://github.com/heyitshenrylin/astiri-exercise
 
 Requirements:
 - PHP (8.2.0 cli)
