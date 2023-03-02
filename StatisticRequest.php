@@ -10,16 +10,18 @@ include('Request.php');
  */
 class StatisticRequest extends Request
 {
-    public array $m_requests;  // TODO remove public tag after testing
+    private array $m_requests;
     private float $m_startTime;
     private float $m_endTime;
     private string $m_currentUri;
+    private int $m_bins;
 
     /**
     * Initialize requests structure
     */
-    function __construct() {
+    function __construct(int $maxBins) {
       $this->m_requests = array();
+      $this->m_bins = $maxBins;
     }
     /**
      * Start processing the request in the child class
@@ -39,8 +41,13 @@ class StatisticRequest extends Request
         $this->addToRequests();
     }
 
+    /**
+    * Adds current URI and response time to requests table
+    *
+    */
     private function addToRequests(): void {
         $time = $this->m_endTime - $this->m_startTime;
+        $time = $time * 1000; // Convert to milliseconds
 
         // Check if uri already in completed requests
         if ( array_key_exists( $this->m_currentUri, $this->m_requests ) ) {
@@ -51,27 +58,42 @@ class StatisticRequest extends Request
         }
     }
 
+    /**
+    * Returns a table of URI => Mean
+    *
+    * @return array $uriAvg Table of URI => Mean key-value pairs
+    */
     public function getMean(): array {
       $uriAvg = array();
-      foreach ( $this->m_requests as $uri => $val ) {
+      foreach ( $this->m_requests as $uri => $val ) {  // For each URI
         $fResponseArr = array_filter($this->m_requests[$uri]);
         $uriAvg[$uri] = array_sum($fResponseArr)/count($fResponseArr);
       }
       return $uriAvg;
     }
 
+    /**
+    * Returns a table of URI => Standard Deviation
+    *
+    * Runs in O(n*m) time, where n is number of unique URIs, m is number of times
+    * the URI is requested
+    *
+    * @return array $uriSD Table of URI => Standard Deviation key-value pairs
+    */
     public function getSD(): array {
       $uriAvg = $this->getMean();
       $uriSD = array();
 
-      foreach ( $this->m_requests as $uri => $val ) {
-        $variance = 0.0;
+      foreach ( $this->m_requests as $uri => $val ) { // For each URI
+        $variance = 0.0;  // Reset variance after each URI
 
         $fResponseArr = array_filter($this->m_requests[$uri]);
+        // calculated variance = sum of squared differences to the mean
         foreach ( $fResponseArr as $response ) {
           $variance += pow(($response - $uriAvg[$uri]), 2);
         }
 
+        // SD = sqrt(variance/size of pop.)
         $uriSD[$uri] = (float)sqrt($variance/count($fResponseArr));
       }
       return $uriSD;
