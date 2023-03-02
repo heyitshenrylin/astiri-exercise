@@ -1,12 +1,12 @@
 <?php
 include('Request.php');
 /**
- * Resource request processing class
+ * Resource request processing with statistical calculation class
  *
  * Instantiations of this class do state based processing of resource requests.
  * To use, instantiate an object and call process() on a URI to get the response
- * data. Children of this class can augment functionality by overriding start()
- * and finish().
+ * data. Calling the getMean, getSD, getHistogram methods provide statistical
+ * calculations for mean, standard deviation, frequency histogram respectively
  */
 class StatisticRequest extends Request
 {
@@ -18,9 +18,14 @@ class StatisticRequest extends Request
 
     /**
     * Initialize requests structure
+    * @param int $maxBins The user-specified number of histogram bins
     */
     function __construct(int $maxBins) {
       $this->m_requests = array();
+
+      if (!$maxBins) {
+          throw new UnexpectedValueException("Number of bins must be >0");
+      }
       $this->m_bins = $maxBins;
     }
     /**
@@ -30,14 +35,14 @@ class StatisticRequest extends Request
      */
     protected function start(string $uri): void
     {
-        $this->m_startTime = microtime(true);
+        $this->m_startTime = microtime(true);  // microtime captures millisecond
         $this->m_currentUri = $uri;
     }
 
     /** Finish processing the request in the child class */
     protected function finish(): void
     {
-        $this->m_endTime = microtime(true);
+        $this->m_endTime = microtime(true);  // microtime captures millisecond
         $this->addToRequests();
     }
 
@@ -103,6 +108,7 @@ class StatisticRequest extends Request
     /**
     * Creates a 0-100 normalized histogram
     *
+    * based on https://gist.github.com/hanscode44/e8c2557b83c4f4658f583e230ecd5836
     * @return array $histograms Table of URI => (Table of histogram
     * label => count)
     */
@@ -180,6 +186,7 @@ class StatisticRequest extends Request
     * @param float $max The maximum value in the dataset
     */
     protected function normalize(float $data, float $min, float $max): float {
+        if ($max-$min == 0) throw new RangeException('Invalid Max/Min');
         return 100*(($data-$min)/($max-$min));
     }
 }
