@@ -100,27 +100,33 @@ class StatisticRequest extends Request
         return $uriSD;
     }
 
+    /**
+    * Creates a 0-100 normalized histogram
+    *
+    * @return array $histograms Table of URI => (Table of histogram
+    * label => count)
+    */
     public function getHistogram(): array {
         $histograms = array();
         foreach ( $this->m_requests as $uri => $val ) { // For each URI
-            // Normalize to 0-1
+            // Normalize to 0-100
             $normResponseArr = array_map(
                 fn($data) => $this->normalize(
                     $data,
                     min($this->m_requests[$uri]),
                     max($this->m_requests[$uri])
-                    ),
+                ),
                 $this->m_requests[$uri]
             );
 
             // Create Histogram
             $maxBins = $this->m_bins;
-            $min = min($normResponseArr);
-            $max = max($normResponseArr);
+            $min = min($normResponseArr);  // Normalized = 0
+            $max = max($normResponseArr); // Normalized = 100
 
             $hist = array();
 
-            $valuePerBin = ceil(($max - $min) / $maxBins);
+            $valuePerBin = ($max - $min) / $maxBins;
 
             $totalBins = $maxBins;
 
@@ -150,11 +156,8 @@ class StatisticRequest extends Request
 
                 // Apply label and count
                 if (count($normResponseArr) > 0 || $count > 0) {
-                    $rangeMax = min(ceil(  // use min() because highest value is 100
-                            ($min + ($valuePerBin - 1)) + ($i * $valuePerBin)
-                        ),
-                        100
-                    );
+                    $rangeMax = ceil(
+                            ($min + $valuePerBin + ($i * $valuePerBin)));
                     $label = floor($min + ($i * $valuePerBin))
                         . '-'
                         . $rangeMax;
@@ -170,7 +173,13 @@ class StatisticRequest extends Request
         return $histograms;
     }
 
-    protected function normalize(float $data, int $min, int $max): float {
-        return 100*($data-$min)/($max-$min);
+    /**
+    * 0-100 normalizes a value to a minimum and maximum range
+    * @param float $data The value to normalize
+    * @param float $min The minimum value in the dataset
+    * @param float $max The maximum value in the dataset
+    */
+    protected function normalize(float $data, float $min, float $max): float {
+        return 100*(($data-$min)/($max-$min));
     }
 }
