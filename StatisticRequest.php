@@ -46,8 +46,9 @@ class StatisticRequest extends Request
     *
     */
     private function addToRequests(): void {
-        $time = $this->m_endTime - $this->m_startTime;
-        $time = $time * 1000; // Convert to milliseconds
+        // Convert to milliseconds
+        $time = ($this->m_endTime - $this->m_startTime) * 1000;
+
 
         // Check if uri already in completed requests
         if ( array_key_exists( $this->m_currentUri, $this->m_requests ) ) {
@@ -64,39 +65,112 @@ class StatisticRequest extends Request
     * @return array $uriAvg Table of URI => Mean key-value pairs
     */
     public function getMean(): array {
-      $uriAvg = array();
-      foreach ( $this->m_requests as $uri => $val ) {  // For each URI
-        $fResponseArr = array_filter($this->m_requests[$uri]);
-        $uriAvg[$uri] = array_sum($fResponseArr)/count($fResponseArr);
-      }
-      return $uriAvg;
+        $uriAvg = array();
+        foreach ( $this->m_requests as $uri => $val ) {  // For each URI
+            $numResponses = count($this->m_requests[$uri]);
+            $uriAvg[$uri] = array_sum($this->m_requests[$uri])/$numResponses;
+        }
+        return $uriAvg;
     }
 
     /**
     * Returns a table of URI => Standard Deviation
     *
-    * Runs in O(n*m) time, where n is number of unique URIs, m is number of times
-    * the URI is requested
+    * Runs in O(n*m) time, where n is number of unique URIs, m is number of
+    * times the URI is requested
     *
     * @return array $uriSD Table of URI => Standard Deviation key-value pairs
     */
     public function getSD(): array {
-      $uriAvg = $this->getMean();
-      $uriSD = array();
+        $uriAvg = $this->getMean();
+        $uriSD = array();
 
-      foreach ( $this->m_requests as $uri => $val ) { // For each URI
-        $variance = 0.0;  // Reset variance after each URI
+        foreach ( $this->m_requests as $uri => $val ) { // For each URI
+            $variance = 0.0;  // Reset variance after each URI
 
-        $fResponseArr = array_filter($this->m_requests[$uri]);
-        // calculated variance = sum of squared differences to the mean
-        foreach ( $fResponseArr as $response ) {
-          $variance += pow(($response - $uriAvg[$uri]), 2);
+            // calculated variance = sum of squared differences to the mean
+            foreach ( $this->m_requests[$uri] as $response ) {
+                $variance += pow(($response - $uriAvg[$uri]), 2);
+            }
+
+            $numResponses = count($this->m_requests[$uri]);
+            // SD = sqrt(variance/size of pop.)
+            $uriSD[$uri] = (float)sqrt($variance/$numResponses);
         }
-
-        // SD = sqrt(variance/size of pop.)
-        $uriSD[$uri] = (float)sqrt($variance/count($fResponseArr));
-      }
-      return $uriSD;
+        return $uriSD;
     }
 
+    public function getHistogram(): array {
+        $histograms = array();
+        foreach ( $this->m_requests as $uri => $val ) { // For each URI
+            // Normalize to 0-1
+            $normResponseArr = array_map(
+                fn($data) => $this->normalize(
+                    $data,
+                    min($this->m_requests[$uri]),
+                    max($this->m_requests[$uri])
+                    ),
+                $this->m_requests[$uri]
+            );
+
+            // Create Histogram
+            $maxBins = $this->m_bins;
+            $min = min($normResponseArr);
+            $max = max($normResponseArr);
+
+            $hist = array();
+
+            $valuePerBin = ceil(($max - $min) / $maxBins);
+
+            $totalBins = $maxBins;
+
+
+            sort($normResponseArr);
+
+            for ($i = 0; $i < $totalBins; $i++) {  // For each bin
+                $count = 0;
+                if ($i == $totalBins - 1) {  // At last bin
+                    foreach ($normResponseArr as $key => $number) {
+                        $count++;
+                        unset($normResponseArr[$key]);
+                    }
+                } else {
+                    foreach ($normResponseArr as $key => $number) {
+                        // Check if the value falls within the bin
+                        if ($number <=
+                            (($min + ($valuePerBin - 1)) + ($i * $valuePerBin)))
+                        {  // i.e less than max value of the bin label
+                            $count++;
+                            unset($normResponseArr[$key]);
+                        } else {  // Value was larger than the max of the bin
+                            break;  // Skip to next bin because normResponseArr is sorted
+                        }
+                    }
+                }
+
+                // Apply label and count
+                if (count($normResponseArr) > 0 || $count > 0) {
+                    $rangeMax = min(ceil(  // use min() because highest value is 100
+                            ($min + ($valuePerBin - 1)) + ($i * $valuePerBin)
+                        ),
+                        100
+                    );
+                    $label = floor($min + ($i * $valuePerBin))
+                        . '-'
+                        . $rangeMax;
+
+                    $hist[$label] = $count;
+                }
+
+
+            }
+
+            $histograms[$uri] = $hist;
+        }
+        return $histograms;
+    }
+
+    protected function normalize(float $data, int $min, int $max): float {
+        return 100*($data-$min)/($max-$min);
+    }
 }
